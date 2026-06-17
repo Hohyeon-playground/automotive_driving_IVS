@@ -1,0 +1,17 @@
+# 전체 무시
+*
+
+# .gitignore 자체는 허용
+!.gitignore
+
+# ros2_ws/src 와 py_code 만 허용
+!ros2_ws/
+ros2_ws/*
+!ros2_ws/*.md
+!ros2_ws/src/
+!ros2_ws/src/**
+
+!py_code/
+!py_code/**
+py_code/**/__pycache__/
+py_code/**/*.pyc
