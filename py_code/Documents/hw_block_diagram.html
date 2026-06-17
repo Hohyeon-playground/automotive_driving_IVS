@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Follow-Tool HW Block Diagram</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #1a1a2e;
+    font-family: 'Segoe UI', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px;
+    min-height: 100vh;
+  }
+  h2 {
+    color: #e0e0e0;
+    margin-bottom: 32px;
+    font-size: 18px;
+    letter-spacing: 1px;
+  }
+
+  svg {
+    width: 900px;
+    height: 560px;
+  }
+
+  /* 블럭 */
+  .block rect {
+    rx: 8; ry: 8;
+    stroke-width: 2;
+  }
+  .block text {
+    font-family: 'Segoe UI', sans-serif;
+    dominant-baseline: middle;
+    text-anchor: middle;
+  }
+
+  /* 화살표 */
+  .arrow {
+    stroke-width: 2.5;
+    fill: none;
+    marker-end: url(#arrowhead);
+  }
+  .arrow-red    { stroke: #ff5555; }
+  .arrow-yellow { stroke: #ffd700; }
+  .arrow-cyan   { stroke: #00bcd4; }
+  .arrow-purple { stroke: #ce93d8; }
+  .arrow-orange { stroke: #ff9800; }
+  .arrow-green  { stroke: #66bb6a; }
+  .arrow-white  { stroke: #aaaaaa; }
+
+  .label {
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 11px;
+    fill: #ccc;
+  }
+  .label-red    { fill: #ff7070; }
+  .label-yellow { fill: #ffd700; }
+  .label-cyan   { fill: #4dd0e1; }
+  .label-purple { fill: #ce93d8; }
+  .label-orange { fill: #ffa726; }
+  .label-green  { fill: #81c784; }
+</style>
+</head>
+<body>
+<h2>Follow-Tool HW Block Diagram</h2>
+<svg viewBox="0 0 900 560" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrowhead" markerWidth="8" markerHeight="6"
+            refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#aaa"/>
+    </marker>
+    <marker id="arr-red" markerWidth="8" markerHeight="6"
+            refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#ff5555"/>
+    </marker>
+    <marker id="arr-yellow" markerWidth="8" markerHeight="6"
+            refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#ffd700"/>
+    </marker>
+    <marker id="arr-cyan" markerWidth="8" markerHeight="6"
+            refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#00bcd4"/>
+    </marker>
+    <marker id="arr-purple" markerWidth="8" markerHeight="6"
+            refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#ce93d8"/>
+    </marker>
+    <marker id="arr-orange" markerWidth="8" markerHeight="6"
+            refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#ff9800"/>
+    </marker>
+    <marker id="arr-green" markerWidth="8" markerHeight="6"
+            refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#66bb6a"/>
+    </marker>
+  </defs>
+
+  <!-- ────────────────────────────────────────────── -->
+  <!-- 전원: USB-C 어댑터 -->
+  <g class="block">
+    <rect x="20" y="30" width="130" height="60"
+          fill="#1a3a1a" stroke="#66bb6a"/>
+    <text x="85" y="54" fill="#81c784" font-size="12" font-weight="bold">USB-C 어댑터</text>
+    <text x="85" y="72" fill="#aaa" font-size="11">5V / 3A</text>
+  </g>
+
+  <!-- 전원: 18650 배터리 -->
+  <g class="block">
+    <rect x="20" y="430" width="130" height="60"
+          fill="#3a1a1a" stroke="#ff9800"/>
+    <text x="85" y="454" fill="#ffa726" font-size="12" font-weight="bold">18650 배터리</text>
+    <text x="85" y="472" fill="#aaa" font-size="11">7.4V</text>
+  </g>
+
+  <!-- 라즈베리파이5 (중앙) -->
+  <g class="block">
+    <rect x="310" y="190" width="160" height="160"
+          fill="#1a1a3a" stroke="#5c6bc0" stroke-width="3"/>
+    <text x="390" y="230" fill="#9fa8da" font-size="13" font-weight="bold">라즈베리파이5</text>
+    <text x="390" y="252" fill="#7986cb" font-size="10">Ubuntu 24.04</text>
+    <text x="390" y="268" fill="#7986cb" font-size="10">ROS2 Jazzy</text>
+    <line x1="320" y1="285" x2="460" y2="285" stroke="#5c6bc0" stroke-width="1" stroke-dasharray="4"/>
+    <text x="390" y="305" fill="#aaa" font-size="10">GPIO17 → 서보 PWM</text>
+    <text x="390" y="320" fill="#aaa" font-size="10">GPIO23/24/25 → DC</text>
+  </g>
+
+  <!-- 서보모터 -->
+  <g class="block">
+    <rect x="670" y="100" width="140" height="80"
+          fill="#2a1a2a" stroke="#ff69b4" stroke-width="2"/>
+    <text x="740" y="130" fill="#ff69b4" font-size="13" font-weight="bold">서보모터</text>
+    <text x="740" y="150" fill="#aaa" font-size="10">MG996R</text>
+    <text x="740" y="166" fill="#aaa" font-size="10">조향 (방향)</text>
+  </g>
+
+  <!-- 모터드라이버 -->
+  <g class="block">
+    <rect x="620" y="330" width="140" height="60"
+          fill="#1a2a2a" stroke="#00bcd4" stroke-width="2"/>
+    <text x="690" y="354" fill="#4dd0e1" font-size="12" font-weight="bold">모터드라이버</text>
+    <text x="690" y="372" fill="#aaa" font-size="10">(L298N)</text>
+  </g>
+
+  <!-- DC모터 -->
+  <g class="block">
+    <rect x="670" y="440" width="140" height="60"
+          fill="#1a1a2a" stroke="#ce93d8" stroke-width="2"/>
+    <text x="740" y="464" fill="#ce93d8" font-size="13" font-weight="bold">DC 모터</text>
+    <text x="740" y="482" fill="#aaa" font-size="10">구동 (속도)</text>
+  </g>
+
+  <!-- ────────────────────────────────────────────── -->
+  <!-- 화살표들 -->
+
+  <!-- USB-C → 파이 (전원) -->
+  <path class="arrow arrow-green"
+        d="M 150 60 L 310 270"
+        marker-end="url(#arr-green)"/>
+  <text class="label label-green" x="195" y="140">5V 전원</text>
+
+  <!-- USB-C → 서보 VCC (5V via 파이 핀2) -->
+  <!-- 파이 → 서보 VCC -->
+  <path class="arrow arrow-red"
+        d="M 470 220 L 670 150"
+        marker-end="url(#arr-red)"/>
+  <text class="label label-red" x="530" y="170">5V (핀2)</text>
+
+  <!-- 파이 → 서보 Signal (PWM) -->
+  <path class="arrow arrow-yellow"
+        d="M 470 240 L 670 170"
+        marker-end="url(#arr-yellow)"/>
+  <text class="label label-yellow" x="545" y="215">PWM Signal (GPIO17)</text>
+
+  <!-- 파이 → 모터드라이버 (신호 3개) -->
+  <path class="arrow arrow-cyan"
+        d="M 470 310 L 620 355"
+        marker-end="url(#arr-cyan)"/>
+  <text class="label label-cyan" x="488" y="345">IN1/IN2/ENA</text>
+  <text class="label label-cyan" x="488" y="358">(GPIO 23/24/25)</text>
+
+  <!-- 18650 → 모터드라이버 (전력) -->
+  <path class="arrow arrow-orange"
+        d="M 150 460 L 620 375"
+        marker-end="url(#arr-orange)"/>
+  <text class="label label-orange" x="290" y="440">7.4V 전력 (VIN)</text>
+
+  <!-- 모터드라이버 → DC모터 -->
+  <path class="arrow arrow-purple"
+        d="M 690 390 L 720 440"
+        marker-end="url(#arr-purple)"/>
+  <text class="label label-purple" x="715" y="425">OUT1/OUT2</text>
+
+  <!-- GND 공통선 (점선) -->
+  <line x1="85" y1="430" x2="85" y2="380" stroke="#555" stroke-width="1.5" stroke-dasharray="5"/>
+  <line x1="85" y1="380" x2="390" y2="380" stroke="#555" stroke-width="1.5" stroke-dasharray="5"/>
+  <line x1="390" y1="380" x2="390" y2="350" stroke="#555" stroke-width="1.5" stroke-dasharray="5"/>
+  <line x1="390" y1="380" x2="690" y2="380" stroke="#555" stroke-width="1.5" stroke-dasharray="5"/>
+  <text x="200" y="375" fill="#666" font-size="11">공통 GND</text>
+
+  <!-- 범례 -->
+  <g transform="translate(20, 510)">
+    <rect x="0" y="0" width="860" height="34" fill="#111" rx="6"/>
+    <circle cx="20" cy="17" r="5" fill="#66bb6a"/>
+    <text x="30" y="17" fill="#81c784" font-size="11" dominant-baseline="middle">파이 전원</text>
+    <circle cx="110" cy="17" r="5" fill="#ff5555"/>
+    <text x="120" y="17" fill="#ff7070" font-size="11" dominant-baseline="middle">서보 VCC</text>
+    <circle cx="200" cy="17" r="5" fill="#ffd700"/>
+    <text x="210" y="17" fill="#ffd700" font-size="11" dominant-baseline="middle">서보 Signal (PWM)</text>
+    <circle cx="340" cy="17" r="5" fill="#00bcd4"/>
+    <text x="350" y="17" fill="#4dd0e1" font-size="11" dominant-baseline="middle">DC 제어 신호</text>
+    <circle cx="450" cy="17" r="5" fill="#ff9800"/>
+    <text x="460" y="17" fill="#ffa726" font-size="11" dominant-baseline="middle">DC 전력 (배터리)</text>
+    <circle cx="570" cy="17" r="5" fill="#ce93d8"/>
+    <text x="580" y="17" fill="#ce93d8" font-size="11" dominant-baseline="middle">DC 모터 출력</text>
+    <line x1="660" y1="12" x2="690" y2="12" stroke="#555" stroke-width="1.5" stroke-dasharray="4"/>
+    <text x="695" y="17" fill="#666" font-size="11" dominant-baseline="middle">공통 GND</text>
+  </g>
+
+</svg>
+</body>
+</html>

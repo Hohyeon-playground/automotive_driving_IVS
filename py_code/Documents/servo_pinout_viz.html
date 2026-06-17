@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Follow-Tool 서보모터 핀 시각화</title>
+<style>
+  body { font-family: monospace; background: #1e1e1e; color: #d4d4d4; padding: 24px; }
+  h2 { color: #61dafb; border-bottom: 1px solid #444; padding-bottom: 8px; }
+  h3 { color: #ffd700; }
+
+  /* GPIO 핀 보드 */
+  .board { display: flex; flex-direction: column; gap: 2px; margin: 16px 0; }
+  .pin-row { display: flex; align-items: center; gap: 4px; font-size: 13px; }
+  .pin-num { width: 28px; text-align: right; color: #888; }
+  .pin {
+    width: 22px; height: 22px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: bold; color: #000;
+  }
+  .pin-label { font-size: 12px; min-width: 80px; }
+
+  .pin-5v    { background: #ff4444; }
+  .pin-3v3   { background: #ff8c00; }
+  .pin-gnd   { background: #333; color: #aaa; border: 1px solid #666; }
+  .pin-gpio  { background: #4caf50; }
+  .pin-servo-sig  { background: #ff69b4; color: #fff; box-shadow: 0 0 8px #ff69b4; }
+  .pin-servo-vcc  { background: #ff2222; color: #fff; box-shadow: 0 0 8px #ff4444; }
+  .pin-dc-ena     { background: #00bcd4; color: #fff; box-shadow: 0 0 8px #00bcd4; }
+  .pin-dc-in1     { background: #9c27b0; color: #fff; box-shadow: 0 0 8px #9c27b0; }
+  .pin-dc-in2     { background: #673ab7; color: #fff; box-shadow: 0 0 8px #673ab7; }
+  .pin-unused     { background: #2a2a2a; color: #555; border: 1px solid #444; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  .legend-dot { width: 16px; height: 16px; border-radius: 50%; }
+
+  /* 서보 연결도 */
+  .servo-box {
+    border: 2px solid #ff69b4;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 16px 0;
+    background: #2a1a2a;
+  }
+  .wire { display: flex; align-items: center; gap: 12px; margin: 8px 0; font-size: 14px; }
+  .wire-line { flex: 1; height: 2px; }
+  .wire-red    { background: #ff4444; }
+  .wire-brown  { background: #8b4513; }
+  .wire-yellow { background: #ffd700; }
+  .badge {
+    padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: bold;
+  }
+  .badge-servo { background: #ff69b4; color: #000; }
+  .badge-pi    { background: #4caf50; color: #000; }
+
+  /* PWM 값 시각화 */
+  .pwm-bar-container { margin: 16px 0; }
+  .pwm-track {
+    position: relative;
+    height: 40px;
+    background: #2a2a2a;
+    border-radius: 20px;
+    border: 1px solid #444;
+    margin: 8px 0;
+  }
+  .pwm-range {
+    position: absolute;
+    height: 100%;
+    background: linear-gradient(90deg, #4caf50, #ff9800, #f44336);
+    border-radius: 20px;
+    opacity: 0.3;
+  }
+  .pwm-marker {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 3px;
+    border-radius: 2px;
+  }
+  .pwm-label {
+    position: absolute;
+    top: -20px;
+    transform: translateX(-50%);
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .pwm-value-label {
+    position: absolute;
+    bottom: -20px;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: #888;
+  }
+  .marker-left   { background: #4caf50; }
+  .marker-center { background: #ffd700; }
+  .marker-right  { background: #f44336; }
+
+  .issue-box {
+    border: 2px solid #ff9800;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 16px 0;
+    background: #2a2000;
+  }
+  .issue-box h3 { color: #ff9800; margin-top: 0; }
+  .check-item { display: flex; gap: 10px; margin: 8px 0; align-items: flex-start; }
+  .check-num {
+    background: #ff9800; color: #000;
+    border-radius: 50%; width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: bold; font-size: 12px; flex-shrink: 0;
+  }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+
+  @media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<h2>Follow-Tool 서보모터 핀 시각화 (우조향 점검용)</h2>
+
+<div class="two-col">
+
+<!-- 왼쪽: GPIO 핀 배열 -->
+<div>
+  <h3>라즈베리파이5 40핀 (물리 핀 기준)</h3>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#ff69b4"></div>서보 Signal</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#ff2222"></div>서보 VCC (5V)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#00bcd4"></div>DC ENA (PWM)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#9c27b0"></div>DC IN1</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#673ab7"></div>DC IN2</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#333; border:1px solid #666"></div>GND</div>
+  </div>
+
+  <div class="board">
+    <!-- 핀 행: [홀수핀] [짝수핀] -->
+    <!-- 1,2 -->
+    <div class="pin-row">
+      <span class="pin-num">1</span>
+      <div class="pin pin-3v3" title="3.3V">3V</div>
+      <div class="pin pin-servo-vcc" title="서보 VCC 연결 (5V)">5V</div>
+      <span style="font-size:12px; color:#ff2222; font-weight:bold;">◄ 서보 VCC (빨강)</span>
+      <span class="pin-num" style="margin-left:4px">2</span>
+    </div>
+    <!-- 3,4 -->
+    <div class="pin-row">
+      <span class="pin-num">3</span>
+      <div class="pin pin-gpio" title="GPIO2">G2</div>
+      <div class="pin pin-5v" title="5V">5V</div>
+      <span class="pin-num">4</span>
+    </div>
+    <!-- 5,6 -->
+    <div class="pin-row">
+      <span class="pin-num">5</span>
+      <div class="pin pin-gpio" title="GPIO3">G3</div>
+      <div class="pin pin-gnd" title="GND">GND</div>
+      <span class="pin-num">6</span>
+    </div>
+    <!-- 7,8 -->
+    <div class="pin-row">
+      <span class="pin-num">7</span>
+      <div class="pin pin-gpio" title="GPIO4">G4</div>
+      <div class="pin pin-gpio" title="GPIO14">G14</div>
+      <span class="pin-num">8</span>
+    </div>
+    <!-- 9,10 -->
+    <div class="pin-row">
+      <span class="pin-num">9</span>
+      <div class="pin pin-gnd" title="GND">GND</div>
+      <div class="pin pin-gpio" title="GPIO15">G15</div>
+      <span class="pin-num">10</span>
+    </div>
+    <!-- 11,12 -->
+    <div class="pin-row">
+      <span class="pin-num">11</span>
+      <div class="pin pin-servo-sig" title="서보 Signal (GPIO17)">G17</div>
+      <div class="pin pin-gpio" title="GPIO18">G18</div>
+      <span style="font-size:12px; color:#ff69b4; font-weight:bold;">◄ 서보 Signal (노랑)</span>
+      <span class="pin-num">12</span>
+    </div>
+    <!-- 13,14 -->
+    <div class="pin-row">
+      <span class="pin-num">13</span>
+      <div class="pin pin-gpio" title="GPIO27">G27</div>
+      <div class="pin pin-gnd" title="GND">GND</div>
+      <span class="pin-num">14</span>
+    </div>
+    <!-- 15,16 -->
+    <div class="pin-row">
+      <span class="pin-num">15</span>
+      <div class="pin pin-gpio" title="GPIO22">G22</div>
+      <div class="pin pin-dc-in1" title="DC IN1 (GPIO23)">G23</div>
+      <span style="font-size:12px; color:#9c27b0; font-weight:bold;">◄ DC IN1</span>
+      <span class="pin-num">16</span>
+    </div>
+    <!-- 17,18 -->
+    <div class="pin-row">
+      <span class="pin-num">17</span>
+      <div class="pin pin-3v3" title="3.3V">3V</div>
+      <div class="pin pin-dc-in2" title="DC IN2 (GPIO24)">G24</div>
+      <span style="font-size:12px; color:#673ab7; font-weight:bold;">◄ DC IN2</span>
+      <span class="pin-num">18</span>
+    </div>
+    <!-- 19,20 -->
+    <div class="pin-row">
+      <span class="pin-num">19</span>
+      <div class="pin pin-gpio" title="GPIO10">G10</div>
+      <div class="pin pin-gnd" title="GND">GND</div>
+      <span class="pin-num">20</span>
+    </div>
+    <!-- 21,22 -->
+    <div class="pin-row">
+      <span class="pin-num">21</span>
+      <div class="pin pin-gpio" title="GPIO9">G9</div>
+      <div class="pin pin-dc-ena" title="DC ENA (GPIO25)">G25</div>
+      <span style="font-size:12px; color:#00bcd4; font-weight:bold;">◄ DC ENA (PWM)</span>
+      <span class="pin-num">22</span>
+    </div>
+    <!-- 23,24 -->
+    <div class="pin-row">
+      <span class="pin-num">23</span>
+      <div class="pin pin-gpio" title="GPIO11">G11</div>
+      <div class="pin pin-gpio" title="GPIO8">G8</div>
+      <span class="pin-num">24</span>
+    </div>
+    <!-- 25,26 -->
+    <div class="pin-row">
+      <span class="pin-num">25</span>
+      <div class="pin pin-gnd" title="GND">GND</div>
+      <div class="pin pin-gpio" title="GPIO7">G7</div>
+      <span class="pin-num">26</span>
+    </div>
+    <!-- 27,28 -->
+    <div class="pin-row">
+      <span class="pin-num">27</span>
+      <div class="pin pin-gpio" title="GPIO0">G0</div>
+      <div class="pin pin-gpio" title="GPIO1">G1</div>
+      <span class="pin-num">28</span>
+    </div>
+    <!-- 29,30 -->
+    <div class="pin-row">
+      <span class="pin-num">29</span>
+      <div class="pin pin-gpio" title="GPIO5">G5</div>
+      <div class="pin pin-gnd" title="GND">GND</div>
+      <span class="pin-num">30</span>
+    </div>
+    <!-- 31,32 -->
+    <div class="pin-row">
+      <span class="pin-num">31</span>
+      <div class="pin pin-gpio" title="GPIO6">G6</div>
+      <div class="pin pin-gpio" title="GPIO12">G12</div>
+      <span class="pin-num">32</span>
+    </div>
+    <!-- 33,34 -->
+    <div class="pin-row">
+      <span class="pin-num">33</span>
+      <div class="pin pin-gpio" title="GPIO13">G13</div>
+      <div class="pin pin-gnd" title="GND">GND</div>
+      <span class="pin-num">34</span>
+    </div>
+    <!-- 35,36 -->
+    <div class="pin-row">
+      <span class="pin-num">35</span>
+      <div class="pin pin-gpio" title="GPIO19">G19</div>
+      <div class="pin pin-gpio" title="GPIO16">G16</div>
+      <span class="pin-num">36</span>
+    </div>
+    <!-- 37,38 -->
+    <div class="pin-row">
+      <span class="pin-num">37</span>
+      <div class="pin pin-gpio" title="GPIO26">G26</div>
+      <div class="pin pin-gpio" title="GPIO20">G20</div>
+      <span class="pin-num">38</span>
+    </div>
+    <!-- 39,40 -->
+    <div class="pin-row">
+      <span class="pin-num">39</span>
+      <div class="pin pin-gnd" title="GND">GND</div>
+      <div class="pin pin-gpio" title="GPIO21">G21</div>
+      <span class="pin-num">40</span>
+    </div>
+  </div>
+  <p style="color:#888; font-size:11px;">※ USB 포트는 아래쪽 기준, 홀수 핀=왼쪽 열</p>
+</div>
+
+<!-- 오른쪽: 서보 연결 + PWM + 점검항목 -->
+<div>
+
+  <h3>서보모터 MG996R 배선</h3>
+  <div class="servo-box">
+    <div style="text-align:center; margin-bottom:12px; color:#ff69b4; font-size:15px; font-weight:bold;">
+      MG996R 서보모터
+    </div>
+    <div class="wire">
+      <span class="badge badge-servo">빨강 (VCC)</span>
+      <div class="wire-line wire-red"></div>
+      <span class="badge badge-pi">핀 2 (5V)</span>
+    </div>
+    <div class="wire">
+      <span class="badge badge-servo">갈색 (GND)</span>
+      <div class="wire-line wire-brown"></div>
+      <span class="badge badge-pi">공통 GND</span>
+    </div>
+    <div class="wire">
+      <span class="badge badge-servo" style="background:#ffd700">노랑 (Signal)</span>
+      <div class="wire-line wire-yellow"></div>
+      <span class="badge badge-pi" style="background:#ff69b4; color:#000">핀 11 (GPIO17)</span>
+    </div>
+    <div style="margin-top:12px; font-size:12px; color:#888;">
+      ⚠ 현재 소프트웨어 PWM → 서보 떨림 원인
+    </div>
+  </div>
+
+  <h3>조향 PWM 값 분포</h3>
+  <div class="pwm-bar-container">
+    <div style="position:relative; height:60px; margin: 24px 8px 28px 8px;">
+      <div class="pwm-track">
+        <!-- 전체 범위 0.025 ~ 0.118, 폭 = 0.093 -->
+        <!-- LEFT=0.025, CENTER=0.071, RIGHT=0.118 -->
+        <!-- 0.025 → 0%, 0.118 → 100% -->
+        <!-- center: (0.071-0.025)/0.093 ≈ 49.5% -->
+        <!-- right: 100% -->
+        <div class="pwm-range" style="left:0; right:0;"></div>
+
+        <!-- 좌 끝 마커: 0% -->
+        <div class="pwm-marker marker-left" style="left:0%;">
+          <span class="pwm-label" style="color:#4caf50;">최대 좌<br>(-1.0)</span>
+          <span class="pwm-value-label" style="left:0">0.025</span>
+        </div>
+
+        <!-- 중립 마커: (0.071-0.025)/0.093 ≈ 49.5% -->
+        <div class="pwm-marker marker-center" style="left:49.5%;">
+          <span class="pwm-label" style="color:#ffd700;">중립<br>(0.0)</span>
+          <span class="pwm-value-label">0.071</span>
+        </div>
+
+        <!-- 우 끝 마커: 100% -->
+        <div class="pwm-marker marker-right" style="left:calc(100% - 3px);">
+          <span class="pwm-label" style="color:#f44336; right:0; left:auto; transform:translateX(-80%)">최대 우<br>(+1.0)</span>
+          <span class="pwm-value-label" style="transform:translateX(-80%)">0.118</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px; margin-top:12px;">
+      <div style="background:#1a2a1a; padding:8px; border-radius:6px; border:1px solid #4caf50;">
+        <div style="color:#4caf50; font-weight:bold;">좌조향 범위</div>
+        <div>0.025 ~ 0.071</div>
+        <div style="color:#888;">폭: 0.046</div>
+      </div>
+      <div style="background:#2a1a1a; padding:8px; border-radius:6px; border:1px solid #f44336;">
+        <div style="color:#f44336; font-weight:bold;">우조향 범위</div>
+        <div>0.071 ~ 0.118</div>
+        <div style="color:#888;">폭: 0.047</div>
+      </div>
+    </div>
+    <div style="margin-top:8px; padding:8px; background:#1a2a1a; border-radius:6px; font-size:12px; color:#66bb6a;">
+      ✓ 좌우 범위 거의 대칭 (좌 0.046 / 우 0.047)<br>
+      SERVO_CENTER=0.071 (1.425ms), min=0.5ms, max=2.35ms 기준
+    </div>
+  </div>
+
+  <h3>우조향 약함 점검 체크리스트</h3>
+  <div class="issue-box">
+    <div class="check-item">
+      <div class="check-num">1</div>
+      <div>
+        <strong>서보혼 물리 중립 확인</strong><br>
+        <span style="color:#aaa; font-size:12px;">PWM 0.116로 설정했을 때 서보혼이 실제로 정중앙인지 자로 측정</span>
+      </div>
+    </div>
+    <div class="check-item">
+      <div class="check-num">2</div>
+      <div>
+        <strong>SERVO_CENTER 재캘리브레이션</strong><br>
+        <span style="color:#aaa; font-size:12px;">실제 중립이 0.116보다 높으면 → CENTER 값을 올려야 좌우 대칭</span>
+      </div>
+    </div>
+    <div class="check-item">
+      <div class="check-num">3</div>
+      <div>
+        <strong>우조향 시 물리 저항 확인</strong><br>
+        <span style="color:#aaa; font-size:12px;">링키지·타이로드가 우측에서 기계적으로 걸리는지 체크</span>
+      </div>
+    </div>
+    <div class="check-item">
+      <div class="check-num">4</div>
+      <div>
+        <strong>하드웨어 PWM 전환 (근본 해결)</strong><br>
+        <span style="color:#aaa; font-size:12px;">소프트웨어 PWM 타이밍 불안정 → config.txt에<br>
+        <code>dtoverlay=pwm,pin=17,func=2</code> 추가</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<div style="color:#555; font-size:11px; margin-top:24px; border-top:1px solid #333; padding-top:8px;">
+  Follow-Tool IVS 2조 | 생성: 2026-06-17 | 핀 기준: 라즈베리파이 표준 40핀 (물리 핀 번호)
+</div>
+
+</body>
+</html>

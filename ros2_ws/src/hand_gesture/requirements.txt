@@ -1,0 +1,4 @@
+# hand_gesture 노드 pip 의존성 (Hailo/NPU 불필요 — 순수 CPU)
+mediapipe==0.10.18
+opencv-python>=4.6
+numpy>=1.24

@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>hand_gesture</name>
+  <version>0.1.0</version>
+  <description>MediaPipe 기반 손 제스처 트리거 노드 (Follow-Tool). /gesture(std_msgs/Int32) 발행. Hailo 불필요.</description>
+  <maintainer email="kiddostudying@gmail.com">ivs</maintainer>
+  <license>MIT</license>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+
+  <!-- pip 의존: mediapipe, opencv-python, numpy (requirements.txt 참고) -->
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

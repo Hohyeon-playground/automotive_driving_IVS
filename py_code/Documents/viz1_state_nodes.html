@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>시각화 1 — 상태 흐름 × 노드 역할</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 48px 24px 80px;
+      min-width: 1080px;
+    }
+    h1 {
+      text-align: center;
+      font-size: 24px;
+      color: #f1f5f9;
+      margin-bottom: 6px;
+      letter-spacing: -0.3px;
+    }
+    .subtitle {
+      text-align: center;
+      font-size: 13px;
+      color: #475569;
+      margin-bottom: 52px;
+    }
+
+    /* ── legend ── */
+    .legend {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-bottom: 40px;
+      flex-wrap: wrap;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+    .legend-dot {
+      width: 12px; height: 12px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    /* ── column header ── */
+    .col-header {
+      display: grid;
+      grid-template-columns: 110px repeat(4, 1fr);
+      gap: 10px;
+      max-width: 1060px;
+      margin: 0 auto 6px;
+      padding: 0 4px;
+    }
+    .col-header > div {
+      text-align: center;
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 8px 4px;
+      border-radius: 6px;
+      letter-spacing: 0.2px;
+    }
+    .ch-empty { background: transparent !important; }
+    .ch-hand  { background: rgba(29,78,216,0.18);  color: #93c5fd; }
+    .ch-aruco { background: rgba(4,120,87,0.18);   color: #6ee7b7; }
+    .ch-sm    { background: rgba(109,40,217,0.18); color: #c4b5fd; }
+    .ch-motor { background: rgba(194,65,12,0.18);  color: #fdba74; }
+
+    /* ── flow wrapper ── */
+    .flow {
+      max-width: 1060px;
+      margin: 0 auto;
+    }
+
+    /* ── state row ── */
+    .state-row {
+      display: grid;
+      grid-template-columns: 110px repeat(4, 1fr);
+      gap: 10px;
+      align-items: stretch;
+    }
+    .state-label {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border-radius: 10px;
+      border: 2px solid;
+      padding: 14px 8px;
+    }
+    .state-circle {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: 900;
+    }
+    .state-name {
+      font-size: 13px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    /* ── node box ── */
+    .node-box {
+      border-radius: 10px;
+      border: 1px solid;
+      padding: 14px 15px;
+      min-height: 130px;
+    }
+    .node-box.inactive {
+      opacity: 0.22;
+    }
+    .node-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      letter-spacing: 0.3px;
+    }
+    .active-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #4ade80;
+      flex-shrink: 0;
+    }
+    .inactive-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #475569;
+      flex-shrink: 0;
+    }
+    .node-text {
+      font-size: 12.5px;
+      line-height: 1.75;
+      color: #cbd5e1;
+    }
+    .chip {
+      display: inline-block;
+      font-family: 'Consolas', monospace;
+      font-size: 10.5px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 4px;
+      padding: 1px 6px;
+      margin-top: 3px;
+    }
+
+    /* ── transition ── */
+    .transition {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 0;
+    }
+    .t-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+    .t-line { width: 2px; height: 14px; background: #334155; }
+    .t-badge {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 20px;
+      padding: 6px 20px;
+      font-size: 12px;
+      color: #64748b;
+    }
+    .t-arrow { font-size: 18px; color: #334155; line-height: 1.2; }
+
+    /* ── state colors ── */
+    /* ① */
+    .sl-1 { border-color: #0891b2; background: rgba(8,145,178,0.06); }
+    .sl-1 .state-circle { background: #0891b2; color: #fff; }
+    .sl-1 .state-name { color: #22d3ee; }
+    /* ② */
+    .sl-2 { border-color: #16a34a; background: rgba(22,163,74,0.06); }
+    .sl-2 .state-circle { background: #16a34a; color: #fff; }
+    .sl-2 .state-name { color: #4ade80; }
+    /* ③ */
+    .sl-3 { border-color: #b45309; background: rgba(180,83,9,0.06); }
+    .sl-3 .state-circle { background: #b45309; color: #fff; }
+    .sl-3 .state-name { color: #fbbf24; }
+    /* ④ */
+    .sl-4 { border-color: #7c3aed; background: rgba(124,58,237,0.06); }
+    .sl-4 .state-circle { background: #7c3aed; color: #fff; }
+    .sl-4 .state-name { color: #c084fc; }
+    /* ⑤ */
+    .sl-5 { border-color: #be123c; background: rgba(190,18,60,0.06); }
+    .sl-5 .state-circle { background: #be123c; color: #fff; }
+    .sl-5 .state-name { color: #fb7185; }
+
+    /* ── node colors ── */
+    .n-hand  { background: rgba(29,78,216,0.12);  border-color: #1d4ed8; }
+    .n-hand .node-status  { color: #93c5fd; }
+    .n-aruco { background: rgba(4,120,87,0.12);   border-color: #047857; }
+    .n-aruco .node-status { color: #6ee7b7; }
+    .n-sm    { background: rgba(109,40,217,0.12); border-color: #6d28d9; }
+    .n-sm .node-status    { color: #c4b5fd; }
+    .n-motor { background: rgba(194,65,12,0.12);  border-color: #c2410c; }
+    .n-motor .node-status { color: #fdba74; }
+
+    /* ── PDF button ── */
+    .pdf-btn {
+      position: fixed;
+      top: 20px; right: 24px;
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(37,99,235,0.4);
+      z-index: 999;
+      transition: background 0.15s;
+    }
+    .pdf-btn:hover { background: #1d4ed8; }
+
+    @media print {
+      @page { size: A4 landscape; margin: 7mm; }
+      html { zoom: 0.58; }
+      .pdf-btn { display: none; }
+      body {
+        background: #fff; color: #111;
+        padding: 12px 10px; min-width: unset;
+      }
+      h1 { font-size: 20px; color: #111; margin-bottom: 4px; }
+      .subtitle { color: #666; margin-bottom: 20px; }
+      .legend { margin-bottom: 16px; gap: 16px; }
+      .legend-item { color: #444; }
+      .col-header { margin-bottom: 4px; }
+      .col-header > div {
+        padding: 5px 4px; font-size: 10px;
+        -webkit-print-color-adjust: exact; print-color-adjust: exact;
+      }
+      .state-row { gap: 7px; }
+      .state-label { padding: 10px 6px; border-width: 1.5px; }
+      .state-circle {
+        width: 34px; height: 34px; font-size: 16px;
+        -webkit-print-color-adjust: exact; print-color-adjust: exact;
+      }
+      .state-name { font-size: 11px; }
+      .node-box {
+        border-width: 1px; padding: 10px 11px; min-height: unset;
+        -webkit-print-color-adjust: exact; print-color-adjust: exact;
+      }
+      .node-status { font-size: 10px; margin-bottom: 7px; }
+      .node-text { font-size: 11px; line-height: 1.55; color: #222; }
+      .chip { background: #eee; border-color: #ccc; color: #333; font-size: 9.5px; }
+      .inactive { opacity: 0.2; }
+      .t-badge {
+        border-color: #bbb; color: #555; background: #f4f4f4;
+        font-size: 11px; padding: 5px 16px;
+      }
+      .t-line { background: #bbb; }
+      .t-arrow { color: #bbb; font-size: 16px; }
+      .flow { max-width: unset; }
+      .col-header { max-width: unset; }
+    }
+  </style>
+</head>
+<body>
+
+<button class="pdf-btn" onclick="window.print()">PDF로 저장</button>
+<h1>시각화 1 &nbsp;—&nbsp; 상태 흐름 × 노드 역할</h1>
+<p class="subtitle">각 상태에서 어떤 노드가 무엇을 수행하는지</p>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#1d4ed8;"></div>hand_gesture_node</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#047857;"></div>aruco_node</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#6d28d9;"></div>state_machine_node</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#c2410c;"></div>motor_node</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#4ade80;border-radius:50%;"></div>활성</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#334155;border-radius:50%;"></div>비활성</div>
+</div>
+
+<!-- column headers -->
+<div class="col-header">
+  <div class="ch-empty"></div>
+  <div class="ch-hand">hand_gesture<br>_node</div>
+  <div class="ch-aruco">aruco<br>_node</div>
+  <div class="ch-sm">state_machine<br>_node</div>
+  <div class="ch-motor">motor<br>_node</div>
+</div>
+
+<div class="flow">
+
+  <!-- ① 원거리 대기·접근 -->
+  <div class="state-row">
+    <div class="state-label sl-1">
+      <div class="state-circle">①</div>
+      <div class="state-name">원거리<br>대기·접근</div>
+    </div>
+
+    <div class="node-box n-hand inactive">
+      <div class="node-status"><div class="inactive-dot"></div>비활성</div>
+      <div class="node-text">대기</div>
+    </div>
+
+    <div class="node-box n-aruco">
+      <div class="node-status"><div class="active-dot"></div>활성</div>
+      <div class="node-text">
+        아래 카메라로 <b>발 마커</b> 감시<br>
+        solvePnP → tvec 계산<br>
+        tvec_x: 좌우 편차<br>
+        tvec_z: 정면 거리<br>
+        <span class="chip">/aruco_pose {id, tvec_x, tvec_z}</span> 발행
+      </div>
+    </div>
+
+    <div class="node-box n-sm">
+      <div class="node-status"><div class="active-dot"></div>활성</div>
+      <div class="node-text">
+        <span class="chip">/aruco_pose</span> 구독<br>
+        마커 미감지 → DC 정지<br>
+        마커 감지 → tvec_x → steer_angle<br>
+        DC 전진<br>
+        tvec_z &lt; 근거리 임계값<br>
+        → 정지 + 상태 ② 전환<br>
+        <span class="chip">/motor_cmd</span> 발행
+      </div>
+    </div>
+
+    <div class="node-box n-motor">
+      <div class="node-status"><div class="active-dot"></div>활성</div>
+      <div class="node-text">
+        마커 감지 전:<br>
+        &nbsp;&nbsp;DC 모터: <b>정지</b><br>
+        &nbsp;&nbsp;서보 모터: <b>중립</b><br>
+        마커 감지 후:<br>
+        &nbsp;&nbsp;DC 모터: <b>전진</b><br>
+        &nbsp;&nbsp;서보 모터: <b>steer_angle 적용</b>
+      </div>
+    </div>
+  </div>
+
+  <!-- transition ①→② -->
+  <div class="transition">
+    <div class="t-inner">
+      <div class="t-line"></div>
+      <div class="t-badge">발 마커 tvec_z &lt; 근거리 임계값 (손 인식 가능 거리)</div>
+      <div class="t-arrow">▼</div>
+    </div>
+  </div>
+
+  <!-- ② 근거리 대기 -->
+  <div class="state-row">
+    <div class="state-label sl-2">
+      <div class="state-circle">②</div>
+      <div class="state-name">근거리<br>대기</div>
+    </div>
+
+    <div class="node-box n-hand">
+      <div class="node-status"><div class="active-dot"></div>활성</div>
+      <div class="node-text">
+        위 카메라 영상 수신<br>
+        Hailo-8 추론 실행<br>
+        <b>1번 제스처</b> N프레임 감지<br>
+        <span class="chip">/gesture {type:1}</span> 발행
+      </div>
+    </div>
+
+    <div class="node-box n-aruco inactive">
+      <div class="node-status"><div class="inactive-dot"></div>비활성</div>
+      <div class="node-text">대기</div>
+    </div>
+
+    <div class="node-box n-sm">
+      <div class="node-status"><div class="active-dot"></div>활성</div>
+      <div class="node-text">
+        <span class="chip">/gesture</span> 구독<br>
+        type == 1 감지 시<br>
+        → 상태 ③ 전환<br>
+        <span class="chip">/motor_cmd {stop}</span> 발행
+      </div>
+    </div>
+
+    <div class="node-box n-motor">
+      <div class="node-status"><div class="active-dot"></div>활성</div>
+      <div class="node-text">
+        DC 모터: <b>정지</b><br>
+        서보 모터: <b>중립</b>
+      </div>
+    </div>
+  </div>
+
+  <!-- transition ②→③ -->
+  <div class="transition">
+    <div class="t-inner">
+      <div class="t-line"></div>
+      <div class="t-badge">1번 제스처 N프레임 연속 감지</div>
+      <div class="t-arrow">▼</div>
+    </div>
+  </div>
+
+  <!-- ③ 접근 -->
+  <div class="state-row">
+    <div class="state-label sl-3">
+      <div class="state-circle">③</div>
+      <div class="state-name">접근</div>
+    </div>
+
+    <div class="node-box n-hand inactive">
+      <div class="node-status"><div class="inactive-dot"></div>비활성</div>
+      <div class="node-text">대기</div>
+    </div>
+
+    <div class="node-box n-aruco">
+      <div class="node-status"><div class="active-dot"></div>활성</div>
+      <div class="node-text">
+        아래 카메라로 <b>발 마커</b> 인식<br>
+        solvePnP → tvec 계산<br>
+        tvec_x: 좌우 편차<br>
+        tvec_z: 정면 거리<br>
+        <span class="chip">/aruco_pose {id, tvec_x, tvec_z}</span> 발행
+      </div>
+    </div>
+
+    <div class="node-box n-sm">
+      <div class="node-status"><div class="active-dot"></div>활성</div>
+      <div class="node-text">
+        <span class="chip">/aruco_pose</span> 구독<br>
+        tvec_x → steer_angle 계산<br>
+        tvec_z &lt; 정지 임계값<br>
+        → 정지 + 상태 ④ 전환<br>
+        <span class="chip">/motor_cmd {forward, angle}</span> 발행
+      </div>
+    </div>
+
+    <div class="node-box n-motor">
+      <div class="node-status"><div class="active-dot"></div>활성</div>
+      <div class="node-text">
+        DC 모터: <b>전진</b><br>
+        서보 모터: <b>steer_angle 적용</b>
+      </div>
+    </div>
+  </div>
+
+  <!-- transition ③→④ -->
+  <div class="transition">
+    <div class="t-inner">
+      <div class="t-line"></div>
+      <div class="t-badge">발 마커 tvec_z &lt; 정지 임계값 (충분히 가까워짐)</div>
+      <div class="t-arrow">▼</div>
+    </div>
+  </div>
+
+  <!-- ④ 교환 대기 -->
+  <div class="state-row">
+    <div class="state-label sl-4">
+      <div class="state-circle">④</div>
+      <div class="state-name">교환<br>대기</div>
+    </div>
+
+    <div class="node-box n-hand">
+      <div class="node-status"><div class="active-dot"></div>활성</div>
+      <div class="node-text">
+        위 카메라 영상 수신<br>
+        Hailo-8 추론 실행<br>
+        <b>2번 제스처</b> 감지<br>
+        <span class="chip">/gesture {type:2}</span> 발행
+      </div>
+    </div>
+
+    <div class="node-box n-aruco inactive">
+      <div class="node-status"><div class="inactive-dot"></div>비활성</div>
+      <div class="node-text">대기</div>
+    </div>
+
+    <div class="node-box n-sm">
+      <div class="node-status"><div class="active-dot"></div>활성</div>
+      <div class="node-text">
+        <span class="chip">/gesture</span> 구독<br>
+        type == 2 감지 시<br>
+        → 상태 ⑤ 전환<br>
+        <span class="chip">/motor_cmd {stop}</span> 발행
+      </div>
+    </div>
+
+    <div class="node-box n-motor">
+      <div class="node-status"><div class="active-dot"></div>활성</div>
+      <div class="node-text">
+        DC 모터: <b>정지</b><br>
+        서보 모터: <b>중립</b>
+      </div>
+    </div>
+  </div>
+
+  <!-- transition ④→⑤ -->
+  <div class="transition">
+    <div class="t-inner">
+      <div class="t-line"></div>
+      <div class="t-badge">2번 제스처 감지</div>
+      <div class="t-arrow">▼</div>
+    </div>
+  </div>
+
+  <!-- ⑤ 복귀 -->
+  <div class="state-row">
+    <div class="state-label sl-5">
+      <div class="state-circle">⑤</div>
+      <div class="state-name">복귀</div>
+    </div>
+
+    <div class="node-box n-hand inactive">
+      <div class="node-status"><div class="inactive-dot"></div>비활성</div>
+      <div class="node-text">대기</div>
+    </div>
+
+    <div class="node-box n-aruco">
+      <div class="node-status"><div class="active-dot"></div>활성</div>
+      <div class="node-text">
+        아래 카메라로 <b>홈 마커</b> 탐색<br>
+        마커 감지 후 solvePnP → tvec 계산<br>
+        tvec_x: 좌우 편차<br>
+        tvec_z: 정면 거리<br>
+        <span class="chip">/aruco_pose {id, tvec_x, tvec_z}</span> 발행
+      </div>
+    </div>
+
+    <div class="node-box n-sm">
+      <div class="node-status"><div class="active-dot"></div>활성</div>
+      <div class="node-text">
+        <span class="chip">/aruco_pose</span> 구독<br>
+        홈 마커 미감지<br>
+        → <span class="chip">/motor_cmd {rotate}</span><br>
+        홈 마커 감지<br>
+        → tvec_x → steer_angle<br>
+        → <span class="chip">/motor_cmd {forward, angle}</span><br>
+        tvec_z &lt; 임계값 → 정지 + 상태 ① 전환
+      </div>
+    </div>
+
+    <div class="node-box n-motor">
+      <div class="node-status"><div class="active-dot"></div>활성</div>
+      <div class="node-text">
+        탐색 중: DC <b>제자리 회전</b><br>
+        마커 감지 후: DC <b>전진</b><br>
+        서보 모터: <b>steer_angle 적용</b>
+      </div>
+    </div>
+  </div>
+
+  <!-- transition ⑤→① -->
+  <div class="transition">
+    <div class="t-inner">
+      <div class="t-line"></div>
+      <div class="t-badge">홈 마커 tvec_z &lt; 임계값 → ① 원거리 대기 (루프)</div>
+      <div class="t-arrow">▼</div>
+    </div>
+  </div>
+
+</div><!-- /flow -->
+</body>
+</html>

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>시각화 2 — 노드 간 관계</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 48px 24px 80px;
+    }
+    h1 {
+      font-size: 24px;
+      color: #f1f5f9;
+      margin-bottom: 6px;
+      letter-spacing: -0.3px;
+    }
+    .subtitle {
+      font-size: 13px;
+      color: #475569;
+      margin-bottom: 48px;
+    }
+    svg { overflow: visible; }
+
+    /* tooltip */
+    .tooltip-bg { filter: drop-shadow(0 4px 16px rgba(0,0,0,0.5)); }
+
+    /* ── PDF button ── */
+    .pdf-btn {
+      position: fixed;
+      top: 20px; right: 24px;
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(37,99,235,0.4);
+      z-index: 999;
+      transition: background 0.15s;
+    }
+    .pdf-btn:hover { background: #1d4ed8; }
+
+    @media print {
+      @page { size: A4 portrait; margin: 10mm; }
+      html { zoom: 0.78; }
+      .pdf-btn { display: none; }
+      body { background: #fff; padding: 20px 16px; align-items: center; }
+      h1 { color: #111; font-size: 22px; }
+      .subtitle { color: #666; margin-bottom: 28px; }
+      svg {
+        width: 100%; height: auto; display: block;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<button class="pdf-btn" onclick="window.print()">PDF로 저장</button>
+<h1>시각화 2 &nbsp;—&nbsp; 노드 간 관계</h1>
+<p class="subtitle">ROS 토픽을 통한 노드 간 데이터 흐름</p>
+
+<svg width="960" height="720" viewBox="0 0 960 720">
+  <defs>
+    <!-- arrow markers -->
+    <marker id="arr-hw" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#334155"/>
+    </marker>
+    <marker id="arr-hand" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#2563eb"/>
+    </marker>
+    <marker id="arr-aruco" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#059669"/>
+    </marker>
+    <marker id="arr-sm" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#7c3aed"/>
+    </marker>
+    <marker id="arr-hw-out" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#c2410c"/>
+    </marker>
+
+    <!-- glow filter -->
+    <filter id="glow-blue" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glow-green" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- HARDWARE INPUTS (top row)                          -->
+  <!-- ═══════════════════════════════════════════════════ -->
+
+  <!-- 위 카메라 + Hailo-8 -->
+  <rect x="60" y="40" width="240" height="72" rx="10"
+        fill="rgba(37,99,235,0.12)" stroke="#1d4ed8" stroke-width="1.5"/>
+  <text x="180" y="70" text-anchor="middle" fill="#93c5fd" font-size="14" font-weight="700">위 카메라 + Hailo-8</text>
+  <text x="180" y="92" text-anchor="middle" fill="#60a5fa" font-size="12">손 모션 AI 추론</text>
+
+  <!-- 아래 카메라 -->
+  <rect x="660" y="40" width="240" height="72" rx="10"
+        fill="rgba(4,120,87,0.12)" stroke="#047857" stroke-width="1.5"/>
+  <text x="780" y="70" text-anchor="middle" fill="#6ee7b7" font-size="14" font-weight="700">아래 카메라</text>
+  <text x="780" y="92" text-anchor="middle" fill="#34d399" font-size="12">OpenCV ArUco (CPU only)</text>
+
+  <!-- hardware arrows down -->
+  <line x1="180" y1="112" x2="180" y2="178" stroke="#334155" stroke-width="2" marker-end="url(#arr-hw)"/>
+  <line x1="780" y1="112" x2="780" y2="178" stroke="#334155" stroke-width="2" marker-end="url(#arr-hw)"/>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- SENSOR NODES (second row)                          -->
+  <!-- ═══════════════════════════════════════════════════ -->
+
+  <!-- hand_gesture_node -->
+  <rect x="40" y="180" width="280" height="130" rx="12"
+        fill="rgba(29,78,216,0.15)" stroke="#2563eb" stroke-width="2"/>
+  <text x="180" y="213" text-anchor="middle" fill="#93c5fd" font-size="15" font-weight="700">hand_gesture_node</text>
+  <line x1="60" y1="222" x2="300" y2="222" stroke="#1d4ed8" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>
+  <text x="180" y="244" text-anchor="middle" fill="#bfdbfe" font-size="12.5">Hailo-8 추론 결과 수신</text>
+  <text x="180" y="264" text-anchor="middle" fill="#bfdbfe" font-size="12.5">1번 제스처: 호출 트리거</text>
+  <text x="180" y="284" text-anchor="middle" fill="#bfdbfe" font-size="12.5">2번 제스처: 완료 트리거</text>
+
+  <!-- aruco_node -->
+  <rect x="640" y="180" width="280" height="130" rx="12"
+        fill="rgba(4,120,87,0.15)" stroke="#059669" stroke-width="2"/>
+  <text x="780" y="213" text-anchor="middle" fill="#6ee7b7" font-size="15" font-weight="700">aruco_node</text>
+  <line x1="660" y1="222" x2="900" y2="222" stroke="#047857" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>
+  <text x="780" y="244" text-anchor="middle" fill="#a7f3d0" font-size="12.5">발 마커 / 홈 마커 인식</text>
+  <text x="780" y="264" text-anchor="middle" fill="#a7f3d0" font-size="12.5">solvePnP → tvec 계산</text>
+  <text x="780" y="284" text-anchor="middle" fill="#a7f3d0" font-size="12.5">tvec_x (편차) · tvec_z (거리)</text>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- TOPIC ARROWS: sensor nodes → state_machine         -->
+  <!-- ═══════════════════════════════════════════════════ -->
+
+  <!-- hand_gesture_node → state_machine_node -->
+  <path d="M 230 310 C 230 420 370 420 370 430"
+        fill="none" stroke="#2563eb" stroke-width="2.5"
+        stroke-dasharray="7,4" marker-end="url(#arr-hand)"/>
+
+  <!-- /gesture topic label -->
+  <rect x="60" y="372" width="158" height="50" rx="8"
+        fill="#1e293b" stroke="#1d4ed8" stroke-width="1"/>
+  <text x="139" y="394" text-anchor="middle" fill="#93c5fd" font-size="12" font-weight="700">/gesture</text>
+  <text x="139" y="412" text-anchor="middle" fill="#64748b" font-size="11">{ type: 0 | 1 | 2 }</text>
+
+  <!-- aruco_node → state_machine_node -->
+  <path d="M 730 310 C 730 420 590 420 590 430"
+        fill="none" stroke="#059669" stroke-width="2.5"
+        stroke-dasharray="7,4" marker-end="url(#arr-aruco)"/>
+
+  <!-- /aruco_pose topic label -->
+  <rect x="742" y="358" width="190" height="68" rx="8"
+        fill="#1e293b" stroke="#047857" stroke-width="1"/>
+  <text x="837" y="381" text-anchor="middle" fill="#6ee7b7" font-size="12" font-weight="700">/aruco_pose</text>
+  <text x="837" y="400" text-anchor="middle" fill="#64748b" font-size="11">{ id, tvec_x, tvec_z }</text>
+  <text x="837" y="418" text-anchor="middle" fill="#64748b" font-size="11">발 마커 ID / 홈 마커 ID</text>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- STATE MACHINE NODE (center)                        -->
+  <!-- ═══════════════════════════════════════════════════ -->
+
+  <rect x="310" y="430" width="340" height="160" rx="14"
+        fill="rgba(109,40,217,0.18)" stroke="#7c3aed" stroke-width="2.5"/>
+  <text x="480" y="468" text-anchor="middle" fill="#c4b5fd" font-size="16" font-weight="700">state_machine_node</text>
+  <line x1="330" y1="478" x2="630" y2="478" stroke="#6d28d9" stroke-width="1" stroke-dasharray="3,3" opacity="0.5"/>
+
+  <!-- state badges inside -->
+  <rect x="318" y="490" width="68" height="26" rx="13" fill="#0891b2" opacity="0.85"/>
+  <text x="352" y="508" text-anchor="middle" fill="white" font-size="11" font-weight="800">① 원거리</text>
+
+  <rect x="392" y="490" width="68" height="26" rx="13" fill="#16a34a" opacity="0.85"/>
+  <text x="426" y="508" text-anchor="middle" fill="white" font-size="11" font-weight="800">② 근거리</text>
+
+  <rect x="466" y="490" width="54" height="26" rx="13" fill="#b45309" opacity="0.85"/>
+  <text x="493" y="508" text-anchor="middle" fill="white" font-size="11" font-weight="800">③ 접근</text>
+
+  <rect x="526" y="490" width="54" height="26" rx="13" fill="#7c3aed" opacity="0.85"/>
+  <text x="553" y="508" text-anchor="middle" fill="white" font-size="11" font-weight="800">④ 교환</text>
+
+  <rect x="586" y="490" width="54" height="26" rx="13" fill="#be123c" opacity="0.85"/>
+  <text x="613" y="508" text-anchor="middle" fill="white" font-size="11" font-weight="800">⑤ 복귀</text>
+
+  <text x="480" y="542" text-anchor="middle" fill="#ddd6fe" font-size="12.5">전환 조건 판단</text>
+  <text x="480" y="562" text-anchor="middle" fill="#ddd6fe" font-size="12.5">/gesture, /aruco_pose 구독</text>
+  <text x="480" y="582" text-anchor="middle" fill="#ddd6fe" font-size="12.5">/motor_cmd 생성 및 발행</text>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- TOPIC ARROW: state_machine → motor_node            -->
+  <!-- ═══════════════════════════════════════════════════ -->
+
+  <line x1="480" y1="590" x2="480" y2="646" stroke="#7c3aed" stroke-width="2.5"
+        marker-end="url(#arr-sm)"/>
+
+  <!-- /motor_cmd topic label -->
+  <rect x="494" y="600" width="170" height="40" rx="8"
+        fill="#1e293b" stroke="#6d28d9" stroke-width="1"/>
+  <text x="579" y="618" text-anchor="middle" fill="#c4b5fd" font-size="12" font-weight="700">/motor_cmd</text>
+  <text x="579" y="634" text-anchor="middle" fill="#64748b" font-size="11">{ mode, steer_angle }</text>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- MOTOR NODE (bottom)                                -->
+  <!-- ═══════════════════════════════════════════════════ -->
+
+  <rect x="310" y="648" width="340" height="56" rx="12"
+        fill="rgba(194,65,12,0.15)" stroke="#ea580c" stroke-width="2"/>
+  <text x="480" y="678" text-anchor="middle" fill="#fb923c" font-size="15" font-weight="700">motor_node</text>
+
+  <!-- hardware outputs -->
+  <line x1="400" y1="704" x2="340" y2="704" stroke="#475569" stroke-width="1.5" marker-end="url(#arr-hw-out)"/>
+  <rect x="200" y="692" width="140" height="34" rx="8" fill="rgba(194,65,12,0.12)" stroke="#c2410c" stroke-width="1"/>
+  <text x="270" y="714" text-anchor="middle" fill="#fdba74" font-size="12.5">서보 모터 (조향)</text>
+
+  <line x1="560" y1="704" x2="618" y2="704" stroke="#475569" stroke-width="1.5" marker-end="url(#arr-hw-out)"/>
+  <rect x="620" y="692" width="140" height="34" rx="8" fill="rgba(194,65,12,0.12)" stroke="#c2410c" stroke-width="1"/>
+  <text x="690" y="714" text-anchor="middle" fill="#fdba74" font-size="12.5">DC 모터 (속도)</text>
+
+  <!-- DC motor mode labels -->
+  <text x="690" y="732" text-anchor="middle" fill="#64748b" font-size="10.5">전진 / 정지 / 제자리 회전</text>
+  <text x="270" y="732" text-anchor="middle" fill="#64748b" font-size="10.5">steer_angle 적용</text>
+
+</svg>
+
+</body>
+</html>
