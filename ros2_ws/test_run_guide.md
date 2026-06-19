@@ -7,45 +7,41 @@
 
 ---
 
-## 1. 카메라 장치 확인
+## 1. 카메라 (자동 — 손댈 필요 없음)
 
-현재 USB 카메라 2대가 연결되어 있고, 각 노드의 코드 기본값과 정확히 일치함.
+USB 카메라 2대는 **by-path 고정경로 + V4L2 백엔드**로 노드에 박혀 있어 `camera_index` 지정 불필요.
+포트에 그대로 꽂혀 있으면 **재부팅해도 안 바뀜**.
 
-| 장치 | 카드 타입 | 용도 | 매핑 노드 |
-|---|---|---|---|
-| `/dev/video0` | USB2.0 PC CAMERA (포트 1.1-2) | **Video Capture** ✅ | hand_gesture (`camera_index=0`) |
-| `/dev/video1` | 〃 | Metadata (사용 불가) | — |
-| `/dev/video2` | USB2.0 PC CAMERA (포트 0-2) | **Video Capture** ✅ | aruco (`camera_index=2`) |
-| `/dev/video3` | 〃 | Metadata (사용 불가) | — |
+| 노드 | 카메라 | USB 포트 (by-path 기본값) |
+|---|---|---|
+| aruco (마커/아래) | `/dev/video0` | `platform-xhci-hcd.1-usb-0:2:1.0-video-index0` |
+| hand_gesture (위/손) | `/dev/video2` | `platform-xhci-hcd.0-usb-0:2:1.0-video-index0` |
 
-`cv2.VideoCapture(N)` 은 `/dev/videoN` 으로 직접 매핑됨 → 기본값 그대로 사용 가능.
+> `video1`/`video3`은 메타데이터 노드(영상 아님). 실제 Video Capture는 `video0`/`video2`.
+> 두 카메라가 같은 모델("USB2.0 PC CAMERA", 시리얼 없음)이라 `/dev/videoN` 번호는 재부팅 시 뒤바뀌지만,
+> **by-path는 USB 포트 기준이라 불변** → 코드에서 그걸 쓰므로 신경 안 써도 됨.
+> 카메라를 **다른 포트로 바꿔 꽂은 경우만** 두 노드의 `camera_path` 파라미터를 서로 바꿔주면 됨.
 
-### 확인 명령어
+### 확인 명령어 (문제 있을 때만)
 ```bash
-v4l2-ctl --list-devices          # USB 카메라가 어느 포트/노드인지
-ls -l /dev/video*                # 노드 목록
-v4l2-ctl -d /dev/video0 --info   # 해당 노드가 Video Capture 인지 확인
+v4l2-ctl --list-devices                  # 카메라가 어느 포트/노드인지
+ls -l /dev/v4l/by-path/                   # 고정경로 → /dev/videoN 매핑
+# 어느 인덱스가 마커를 보는지 콘솔로 확인:
+python3 ~/ros2_ws/cam_probe.py 0
 ```
-
-> ⚠️ 두 카메라가 같은 모델("USB2.0 PC CAMERA")이라 USB 재연결/리부트 시 `video0` ↔ `video2` 번호가 뒤바뀔 수 있음.
-> 화면이 엇갈리면 aruco/gesture 두 노드의 `camera_index` 값을 서로 바꿔주면 됨.
 
 ---
 
 ## 2. 사전 준비 (1회)
 
-아무 터미널에서:
 ```bash
-# GPIO 권한
-sudo chmod a+rw /dev/gpiochip4
-
-# 카메라 점유 해제
-sudo fuser -k /dev/video0 /dev/video2 2>/dev/null
-
-# 빌드
 cd ~/ros2_ws
 colcon build --packages-select state_machine_node aruco_publisher hand_gesture motor_node
 ```
+
+> **GPIO 권한**: `ivs`가 `dialout` 그룹이고 `/dev/gpiochip4`가 udev로 dialout에 열려 있어
+>   `sudo chmod` 불필요. (그룹에서 빠졌다면 `sudo usermod -aG dialout ivs` 후 재로그인)
+> **카메라 점유 해제**(노드 재시작 시 "Device busy" 나면): `tmux kill-session -t robot` 으로 기존 노드부터 종료.
 
 **모든 터미널 공통 헤더** (새 터미널 열 때마다 먼저 실행):
 ```bash
@@ -53,7 +49,9 @@ source /opt/ros/jazzy/setup.bash
 source ~/ros2_ws/install/setup.bash
 ```
 
-> cv2 창(`show_window`)이 뜨려면 `DISPLAY`가 설정된 데스크톱 세션이어야 함. SSH 접속이면 `ssh -X` 로 접속할 것.
+> ⚠️ cv2 창(`show_window`)은 **Pi 본체 모니터의 데스크톱 터미널**에서 실행해야 뜸.
+>   Ubuntu 24.04는 Wayland라 SSH(`ssh -X` 포함)로는 X 권한 문제로 창이 안 뜨고 GTK 에러가 남.
+>   `start_robot.sh` 는 `DISPLAY=:0` 을 자동 설정하므로 Pi 데스크톱에서 실행하면 창이 뜬다.
 
 ---
 

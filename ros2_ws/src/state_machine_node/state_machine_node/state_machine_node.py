@@ -44,10 +44,10 @@ class StateMachineNode(Node):
         self.state       = STATE_FAR
         self.gesture     = 0
         self.gesture_cnt = 0
-        self.marker_id   = None
-        self.tvec_x      = 0.0
-        self.tvec_z      = 999.0   # ✅ 안전한 초기값
-        self.last_pose_t = 0.0
+        # ✅ 마커별로 따로 저장: {id: {'x', 'z', 't'}}
+        # ArUco 노드가 한 프레임에 발·홈 마커를 같은 토픽으로 둘 다 쏘기 때문에
+        # 단일 변수로 덮어쓰면 마지막 마커에 묻혀 다른 마커를 못 본다.
+        self.markers     = {}
 
         self.motor_pub = self.create_publisher(MotorCmd, '/motor_cmd', 10)
         self.create_subscription(PoseStamped, '/aruco/pose', self.on_pose, 10)
@@ -57,16 +57,18 @@ class StateMachineNode(Node):
         self.get_logger().info("State Machine Node 시작!")
         self.get_logger().info(f"상태: {STATE_NAME[self.state]}")
 
-    def on_pose(self, msg):   # ✅ 콜론 추가
-        """ArUco 포즈 수신"""
+    def on_pose(self, msg):
+        """ArUco 포즈 수신 — 마커별로 따로 저장"""
         try:
-            self.marker_id = int(msg.header.frame_id.split('_')[1])
+            mid = int(msg.header.frame_id.split('_')[1])
         except (IndexError, ValueError):
             self.get_logger().warn(f"frame_id 파싱 실패: {msg.header.frame_id}")
             return
-        self.tvec_x      = msg.pose.position.x
-        self.tvec_z      = msg.pose.position.z
-        self.last_pose_t = self.now()
+        self.markers[mid] = {
+            'x': msg.pose.position.x,
+            'z': msg.pose.position.z,
+            't': self.now(),
+        }
 
     def on_gesture(self, msg):
         """✅ data=0 수신 시 카운터 유지 (리셋 안 함)"""
@@ -84,10 +86,14 @@ class StateMachineNode(Node):
         return self.get_clock().now().nanoseconds * 1e-9
 
     def marker_fresh(self, want_id):
-        """✅ None 체크 포함"""
-        return (self.marker_id is not None
-                and self.marker_id == want_id
-                and self.now() - self.last_pose_t < POSE_TIMEOUT)
+        """해당 마커가 POSE_TIMEOUT 내에 최근 감지됐는지 (다른 마커와 독립)"""
+        m = self.markers.get(want_id)
+        return m is not None and self.now() - m['t'] < POSE_TIMEOUT
+
+    def marker_xz(self, want_id):
+        """해당 마커의 (tvec_x, tvec_z). 없으면 안전한 기본값."""
+        m = self.markers.get(want_id)
+        return (m['x'], m['z']) if m is not None else (0.0, 999.0)
 
     def gesture_ok(self, want):
         return self.gesture == want and self.gesture_cnt >= GESTURE_N
@@ -96,8 +102,9 @@ class StateMachineNode(Node):
         self.gesture     = 0
         self.gesture_cnt = 0
 
-    def calc_steer(self):
-        return max(-1.0, min(1.0, self.tvec_x * STEER_GAIN))
+    def calc_steer(self, want_id):
+        tvec_x, _ = self.marker_xz(want_id)
+        return max(-1.0, min(1.0, tvec_x * STEER_GAIN))
 
     def publish_motor(self, mode, steer=0.0):
         cmd = MotorCmd()
@@ -114,13 +121,14 @@ class StateMachineNode(Node):
 
         if s == STATE_FAR:
             if self.marker_fresh(FOOT_MARKER_ID):
-                if self.tvec_z < NEAR_THRESHOLD:
+                _, tvec_z = self.marker_xz(FOOT_MARKER_ID)
+                if tvec_z < NEAR_THRESHOLD:
                     self.get_logger().info(
-                        f"근거리 진입 tvec_z={self.tvec_z:.2f}m → ② 근거리 대기")
+                        f"근거리 진입 tvec_z={tvec_z:.2f}m → ② 근거리 대기")
                     self.publish_motor(MODE_STOP)
                     self.transition(STATE_NEAR)
                 else:
-                    self.publish_motor(MODE_FORWARD, self.calc_steer())
+                    self.publish_motor(MODE_FORWARD, self.calc_steer(FOOT_MARKER_ID))
             else:
                 self.publish_motor(MODE_FORWARD, SEARCH_STEER)
 
@@ -133,13 +141,14 @@ class StateMachineNode(Node):
 
         elif s == STATE_APPROACH:
             if self.marker_fresh(FOOT_MARKER_ID):
-                if self.tvec_z < STOP_THRESHOLD:
+                _, tvec_z = self.marker_xz(FOOT_MARKER_ID)
+                if tvec_z < STOP_THRESHOLD:
                     self.get_logger().info(
-                        f"발 마커 도달 tvec_z={self.tvec_z:.2f}m → ④ 교환 대기")
+                        f"발 마커 도달 tvec_z={tvec_z:.2f}m → ④ 교환 대기")
                     self.publish_motor(MODE_STOP)
                     self.transition(STATE_EXCHANGE)
                 else:
-                    self.publish_motor(MODE_FORWARD, self.calc_steer())
+                    self.publish_motor(MODE_FORWARD, self.calc_steer(FOOT_MARKER_ID))
             else:
                 self.publish_motor(MODE_STOP)
                 self.get_logger().warn("발 마커 소실 → 정지")
@@ -153,13 +162,14 @@ class StateMachineNode(Node):
 
         elif s == STATE_RETURN:
             if self.marker_fresh(HOME_MARKER_ID):
-                if self.tvec_z < HOME_THRESHOLD:
+                _, tvec_z = self.marker_xz(HOME_MARKER_ID)
+                if tvec_z < HOME_THRESHOLD:
                     self.get_logger().info(
-                        f"홈 마커 도달 tvec_z={self.tvec_z:.2f}m → ① 원거리 대기")
+                        f"홈 마커 도달 tvec_z={tvec_z:.2f}m → ① 원거리 대기")
                     self.publish_motor(MODE_STOP)
                     self.transition(STATE_FAR)
                 else:
-                    self.publish_motor(MODE_FORWARD, self.calc_steer())
+                    self.publish_motor(MODE_FORWARD, self.calc_steer(HOME_MARKER_ID))
             else:
                 self.publish_motor(MODE_FORWARD, SEARCH_STEER)
 
