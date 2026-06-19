@@ -26,9 +26,14 @@ class ArucoNode(Node):
     def __init__(self):
         super().__init__('aruco_node')
 
-        self.declare_parameter('camera_index', 0)
+        # 마커(아래) 카메라 = USB 포트 xhci-hcd.1. by-path는 재부팅해도 안 바뀜.
+        # camera_path 가 비어있지 않으면 그걸 우선 사용, 비면 camera_index 폴백.
+        DEFAULT_CAM_PATH = '/dev/v4l/by-path/platform-xhci-hcd.1-usb-0:2:1.0-video-index0'
+        self.declare_parameter('camera_index', 2)
+        self.declare_parameter('camera_path', DEFAULT_CAM_PATH)
         self.declare_parameter('show_window', True)
         self.camera_index = self.get_parameter('camera_index').value
+        self.camera_path  = self.get_parameter('camera_path').value
         self.show_window  = self.get_parameter('show_window').value
 
         # 캘리브레이션 데이터 로드
@@ -46,8 +51,16 @@ class ArucoNode(Node):
         parameters.polygonalApproxAccuracyRate = 0.05
         self.detector = cv2.aruco.ArucoDetector(aruco_dict, parameters)
 
-        # USB 카메라 열기
-        self.cap = cv2.VideoCapture(self.camera_index)
+        # USB 카메라 열기 (V4L2 백엔드 강제 — GStreamer 인덱스 꼬임 방지)
+        # 고정경로(by-path) 우선, 없으면 숫자 인덱스 폴백
+        import os
+        if self.camera_path and os.path.exists(self.camera_path):
+            src = os.path.realpath(self.camera_path)
+            self.get_logger().info(f"카메라 고정경로 사용: {self.camera_path} -> {src}")
+        else:
+            src = self.camera_index
+            self.get_logger().warn(f"고정경로 없음, 인덱스 {src} 로 폴백")
+        self.cap = cv2.VideoCapture(src, cv2.CAP_V4L2)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
         self.cap.set(cv2.CAP_PROP_FPS, 30)

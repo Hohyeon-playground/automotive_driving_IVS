@@ -15,11 +15,9 @@ Follow-Tool 통합 노드. 발행: /gesture  std_msgs/Int32  { 0=없음, 1=호�
   gesture_done(str=paper)      → type 2 (완료)
   flip(bool=True)       좌우 반전(거울)
   show_window(bool=False) True 이면 로컬 cv2.imshow() 창 표시
-  web_port(int=0)       >0 이면 MJPEG 디버그 뷰어(http://<ip>:web_port), 0=off
 """
 import threading
 import time
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import numpy as np
 import cv2
@@ -43,6 +41,10 @@ class HandGestureNode(Node):
     def __init__(self):
         super().__init__("hand_gesture_node")
         self.cam_index = int(self.declare_parameter("camera_index", 0).value)
+        # 위(손) 카메라 = USB 포트 xhci-hcd.0. by-path는 재부팅해도 안 바뀜.
+        self.cam_path = str(self.declare_parameter(
+            "camera_path",
+            "/dev/v4l/by-path/platform-xhci-hcd.0-usb-0:2:1.0-video-index0").value)
         self.width = int(self.declare_parameter("width", 640).value)
         self.height = int(self.declare_parameter("height", 480).value)
         self.complexity = int(self.declare_parameter("complexity", 0).value)
@@ -51,19 +53,14 @@ class HandGestureNode(Node):
         self.g_done = str(self.declare_parameter("gesture_done", "paper").value)
         self.flip = bool(self.declare_parameter("flip", True).value)
         self.show_window = bool(self.declare_parameter("show_window", False).value)
-        self.web_port = int(self.declare_parameter("web_port", 0).value)
 
         self.pub = self.create_publisher(Int32, "gesture", 10)
         self.get_logger().info(
             f"hand_gesture_node 시작 — cam={self.cam_index} {self.width}x{self.height} "
             f"complexity={self.complexity} call='{self.g_call}'->1 done='{self.g_done}'->2 "
-            f"show_window={self.show_window} web_port={self.web_port}")
+            f"show_window={self.show_window}")
 
         self._stop = False
-        self._jpg = None
-        self._lock = threading.Lock()
-        if self.web_port > 0:
-            threading.Thread(target=self._serve, daemon=True).start()
         self._th = threading.Thread(target=self._loop, daemon=True)
         self._th.start()
 
@@ -78,7 +75,11 @@ class HandGestureNode(Node):
         hands = mp.solutions.hands.Hands(
             static_image_mode=False, max_num_hands=1, model_complexity=self.complexity,
             min_detection_confidence=0.5, min_tracking_confidence=0.5)
-        cam = open_camera(self.width, self.height, device=self.cam_index)
+        # 고정경로(by-path) 우선, 없으면 숫자 인덱스 폴백
+        import os
+        dev = os.path.realpath(self.cam_path) if (self.cam_path and os.path.exists(self.cam_path)) else self.cam_index
+        self.get_logger().info(f"카메라 소스: {dev}")
+        cam = open_camera(self.width, self.height, device=dev)
         last, count, confirmed = None, 0, ""
         while not self._stop and rclpy.ok():
             frame = cam.read()
@@ -114,16 +115,15 @@ class HandGestureNode(Node):
             gtype = self._map(confirmed)
             self.pub.publish(Int32(data=gtype))
 
-            if self.show_window or self.web_port > 0:
-                self._render(frame, lm, confirmed, gtype, local=self.show_window, web=self.web_port > 0)
+            if self.show_window:
+                self._render(frame, lm, confirmed, gtype)
 
         cam.close()
         hands.close()
         if self.show_window:
             cv2.destroyAllWindows()
 
-    # ---------- 선택: 로컬 창 / MJPEG 디버그 뷰어 ----------
-    def _render(self, frame, lm, confirmed, gtype, local=False, web=False):
+    def _render(self, frame, lm, confirmed, gtype):
         if lm is not None:
             li = lm.astype(int)
             for a, b in HAND_EDGES:
@@ -132,48 +132,8 @@ class HandGestureNode(Node):
                 cv2.circle(frame, (int(p[0]), int(p[1])), 3, (0, 0, 255), -1)
         cv2.putText(frame, f"gesture={confirmed or '-'}  /gesture={gtype}",
                     (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 255), 2)
-        if local:
-            cv2.imshow("Hand Gesture Node", frame)
-            cv2.waitKey(1)
-        if web:
-            ok, jpg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
-            if ok:
-                with self._lock:
-                    self._jpg = jpg.tobytes()
-
-    def _serve(self):
-        node = self
-
-        class H(BaseHTTPRequestHandler):
-            def log_message(self, *a):
-                pass
-
-            def do_GET(self):
-                if self.path != "/stream":
-                    self.send_response(200)
-                    self.send_header("Content-Type", "text/html")
-                    self.end_headers()
-                    self.wfile.write(b'<body style="margin:0;background:#111">'
-                                     b'<img src="/stream" style="max-width:100%"></body>')
-                    return
-                self.send_response(200)
-                self.send_header("Content-Type",
-                                 "multipart/x-mixed-replace; boundary=frame")
-                self.end_headers()
-                try:
-                    while not node._stop:
-                        with node._lock:
-                            jpg = node._jpg
-                        if jpg is None:
-                            time.sleep(0.02); continue
-                        self.wfile.write(b"--frame\r\nContent-Type: image/jpeg\r\n")
-                        self.wfile.write(f"Content-Length: {len(jpg)}\r\n\r\n".encode())
-                        self.wfile.write(jpg + b"\r\n")
-                        time.sleep(0.03)
-                except (BrokenPipeError, ConnectionResetError):
-                    pass
-
-        ThreadingHTTPServer(("0.0.0.0", self.web_port), H).serve_forever()
+        cv2.imshow("Hand Gesture Node", frame)
+        cv2.waitKey(1)
 
 
 def main():

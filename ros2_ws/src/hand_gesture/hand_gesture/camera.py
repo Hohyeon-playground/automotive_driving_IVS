@@ -65,7 +65,7 @@ class CsiCamera:
 
 def open_camera(width=640, height=480, framerate=30, device=0):
     """device 번호의 USB 웹캠을 우선 시도, 실패하면 CSI(rpicam) 폴백."""
-    cap = cv2.VideoCapture(device)
+    cap = cv2.VideoCapture(device, cv2.CAP_V4L2)  # V4L2 강제 — GStreamer 인덱스 꼬임 방지
     if cap.isOpened():
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
