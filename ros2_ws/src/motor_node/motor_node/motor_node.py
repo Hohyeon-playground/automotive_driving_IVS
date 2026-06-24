@@ -18,13 +18,13 @@ SERVO_LEFT   = 0.040   # 최대 좌조향
 SERVO_RIGHT  = 0.095   # 최대 우조향
 
 # ── DC 출력 튜닝값 ──
-DRIVE_BASE     = 0.50   # 직진 순항 PWM
-DRIVE_TURN_SLOW = 0.15  # 조향각 비례 출력 감산 (회전 반경 축소)
-DRIVE_MIN      = 0.35   # 회전 중 최소 출력 (스크럽 저항 극복, 스톨 방지)
+DRIVE_BASE     = 0.80   # 직진 순항 PWM
+DRIVE_TURN_SLOW = 0.01  # 조향각 비례 출력 감산 (회전 반경 축소)
+DRIVE_MIN      = 0.70   # 회전 중 최소 출력 (스크럽 저항 극복, 스톨 방지)
 KICK_STRAIGHT = 0.70   # 정지→전진 기동킥 (직진)
 KICK_STEER    = 0.85   # 정지→전진 기동킥 (조향 중 출발)
 KICK_T        = 0.20   # 기동킥 지속 시간 (초)
-DC_TURN_SPEED = 0.70   # MODE_ROTATE 탐색 출력
+DC_TURN_SPEED = 0.80   # MODE_ROTATE 탐색 출력
 
 # ── 모터 모드 (state_machine_node 규약과 동일) ──
 MODE_STOP    = 0

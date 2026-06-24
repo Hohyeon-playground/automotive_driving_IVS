@@ -28,12 +28,12 @@ MODE_STOP      = 0
 MODE_FORWARD   = 1
 MODE_ROTATE    = 2
 
-NEAR_THRESHOLD = 0.40
-STOP_THRESHOLD = 0.20
-HOME_THRESHOLD = 0.15
+NEAR_THRESHOLD = 0.65
+STOP_THRESHOLD = 0.40
+HOME_THRESHOLD = 0.40
 STEER_GAIN     = 1.5
 GESTURE_N      = 1
-POSE_TIMEOUT   = 0.5
+POSE_TIMEOUT   = 0.3
 SEARCH_STEER   = -1.0
 
 
@@ -130,7 +130,8 @@ class StateMachineNode(Node):
                 else:
                     self.publish_motor(MODE_FORWARD, self.calc_steer(FOOT_MARKER_ID))
             else:
-                self.publish_motor(MODE_FORWARD, SEARCH_STEER)
+                self.publish_motor(MODE_STOP)
+                self.get_logger().warn("발 마커 소실 → 정지")
 
         elif s == STATE_NEAR:
             self.publish_motor(MODE_STOP)
